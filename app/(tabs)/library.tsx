@@ -1,9 +1,9 @@
 import { View, Text, StyleSheet } from 'react-native';
 
-export default function HomeScreen() {
+export default function LibraryScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome to Spotify Clone</Text>
+      <Text style={styles.title}>Your Library</Text>
     </View>
   );
 }
