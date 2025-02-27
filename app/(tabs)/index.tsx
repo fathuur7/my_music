@@ -16,12 +16,18 @@ export default function HomeScreen() {
   ];
 
   const currentHour = new Date().getHours();
-
-  const greeting = currentHour < 12 
-    ? 'Good morning! ☀️ '
-    : currentHour < 18 
-      ? 'Good afternoon! 🌞 '
-      : 'Good evening! 🌃 ';
+  let greeting;
+  if (currentHour < 6) {
+    greeting = 'Good morning, early riser!';
+  } else if (currentHour < 12) {
+    greeting = 'Good morning!';
+  } else if (currentHour < 17) {
+    greeting = 'Good afternoon!';
+  } else if (currentHour < 20) {
+    greeting = 'Good evening!';
+  } else {
+    greeting = 'Good night!';
+  }
 
   useEffect(() => {
     const fetchRecommendations = async () => {

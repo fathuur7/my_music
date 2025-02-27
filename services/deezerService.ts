@@ -1,7 +1,9 @@
 import axios from 'axios';
+import { API_URL, API_KEY } from '@env';
+// import { API_URL, API_KEY } from '@env';
 
-const API_URL = 'https://deezerdevs-deezer.p.rapidapi.com';
-const API_KEY = 'd950cce957mshb42913347a7457cp1dfe38jsn9c2fc9f52bd0';
+// console.log(API_URL); // Debugging: Cek apakah variabel terbaca
+
 
 export const searchArtist = async (query: string) => {
   try {
@@ -15,6 +17,7 @@ export const searchArtist = async (query: string) => {
     return response.data.data;
   } catch (error) {
     console.error('Error fetching data:', error);
+    
     throw error;
   }
 };
