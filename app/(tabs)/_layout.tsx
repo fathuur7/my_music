@@ -1,16 +1,54 @@
 import { Tabs } from 'expo-router';
-import { MaterialIcons } from '@expo/vector-icons';
-import { Colors } from 'react-native/Libraries/NewAppScreen';
+import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
+
+// Custom Tab Bar Icon component with label
+const TabIcon = ({ focused, color, name, label} : any) => {
+  return (
+    <View style={styles.tabIconContainer}>
+      <MaterialIcons 
+        name={name} 
+        size={focused ? 26 : 22} 
+        color={color} 
+      />
+      <Text style={[
+        styles.tabLabel, 
+        { color: color, fontWeight: focused ? '600' : '400' }
+      ]}>
+        {label}
+      </Text>
+    </View>
+  );
+};
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#1DB954', // Warna aktif (hijau Spotify)
-        tabBarInactiveTintColor: '#b3b3b3', // Warna tidak aktif
+        tabBarActiveTintColor: '#1DB954', // Spotify green for active tab
+        tabBarInactiveTintColor: '#b3b3b3', // Gray for inactive tab
         tabBarStyle: {
-          backgroundColor: '#121212', // Warna latar tab bar
-          borderTopWidth: 0, // Hilangkan garis atas
+          backgroundColor: 'rgba(18, 18, 18, 0.98)', // Almost black with slight transparency
+          borderTopWidth: 0,
+          elevation: 0,
+          height: 60 + insets.bottom, // Taller tab bar with safe area padding
+          paddingBottom: insets.bottom, // Safe area padding for bottom
+          paddingTop: 6, // Extra padding on top for better touch targets
+          position: 'absolute', // Make it float
+          borderTopLeftRadius: 16, // Rounded corners
+          borderTopRightRadius: 16,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -3 },
+          shadowOpacity: 0.2,
+          shadowRadius: 5,
+        },
+        headerShown: false, // Hide default header
+        tabBarLabelStyle: {
+          display: 'none', // Hide default labels since we're using custom ones
         },
       }}
     >
@@ -18,29 +56,72 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => (
-            <MaterialIcons name="home" size={24} color={color} />
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon 
+              focused={focused} 
+              color={color} 
+              name="home-filled" 
+              label="" 
+            />
           ),
         }}
       />
+      
       <Tabs.Screen
         name="explore"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => (
-            <MaterialIcons name="search" size={24} color={color} />
+          title: 'Search',
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon 
+              focused={focused} 
+              color={color} 
+              name="search" 
+              label="" 
+            />
           ),
         }}
       />
+      
       <Tabs.Screen
         name="library"
         options={{
-          title: 'Library',
-          tabBarIcon: ({ color }) => (
-            <MaterialIcons name="library-music" size={24} color={color} />
+          title: 'Your Library',
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon 
+              focused={focused} 
+              color={color} 
+              name="library-music" 
+              label="" 
+            />
+          ),
+        }}
+      />
+      
+      <Tabs.Screen
+        name="premium"
+        options={{
+          title: 'Premium',
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon 
+              focused={focused} 
+              color={color} 
+              name="workspace-premium" 
+              label="" 
+            />
           ),
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabIconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabLabel: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+});
