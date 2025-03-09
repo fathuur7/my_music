@@ -1,5 +1,8 @@
 import axios from 'axios';
-import { API_URL, API_KEY } from '@env';
+
+const API_KEY ="d950cce957mshb42913347a7457cp1dfe38jsn9c2fc9f52bd0"
+const API_URL ="https://deezerdevs-deezer.p.rapidapi.com"
+
 export const searchArtist = async (query: string) => {
   try {
     const response = await axios.get(`${API_URL}/search`, {
