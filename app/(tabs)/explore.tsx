@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { searchArtist } from '../../services/deezerService';
+// import { search } from '../../services/search';
 import TrackCard from '../../components/TrackCard/TrackCard';
 import useAudioPlayer from '../../hooks/useAudioPlayer';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -88,6 +89,8 @@ export default function ExploreScreen() {
     
     try {
       const data = await searchArtist(query);
+      // const data2 = await search(query); 
+      // console.log(data2);
       setTracks(data);
       
       // Add to recent searches

@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { searchArtist } from '../../services/deezerService';
+import { useClerk } from '@clerk/clerk-expo';
 
 export default function HomeScreen() {
   const [recommendations, setRecommendations] = useState([]);
   const [popularPlaylists, setPopularPlaylists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { user } = useClerk();
+  const userName = user?.firstName || 'User'; // Fallback to 'User' if firstName is not available
 
   // List of search terms to get random recommendations
   const searchTerms = [
@@ -18,15 +21,15 @@ export default function HomeScreen() {
   const currentHour = new Date().getHours();
   let greeting;
   if (currentHour < 6) {
-    greeting = 'Good morning, early riser!';
+    greeting = 'Good morning, early riser! ' + userName;
   } else if (currentHour < 12) {
-    greeting = 'Good morning!';
+    greeting = 'Good morning! ' + userName;
   } else if (currentHour < 17) {
-    greeting = 'Good afternoon!';
+    greeting = 'Good afternoon! ' + userName;
   } else if (currentHour < 20) {
-    greeting = 'Good evening!';
+    greeting = 'Good evening! ' + userName;
   } else {
-    greeting = 'Good night!';
+    greeting = 'Good night! ' + userName;
   }
 
   useEffect(() => {
@@ -114,6 +117,12 @@ export default function HomeScreen() {
             <TouchableOpacity style={styles.iconButton}>
               <Ionicons name="settings-outline" size={24} color="#fff" />
             </TouchableOpacity>
+            <TouchableOpacity style={styles.iconButton}>
+              <Image 
+                source={{ uri: user?.imageUrl || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y' }}
+                style={styles.profileImage}
+              />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -153,6 +162,11 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  profileImage: {
+    width: 30,
+    height: 30,
+    borderRadius: 20,
+  },
   container: {
     flex: 1,
     backgroundColor: '#121212',
