@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import LoadingOverlay from '../../components/loading/loadingOverlay';
+import React, { useState, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -12,35 +13,105 @@ import {
   StatusBar,
   Platform,
   useWindowDimensions,
-  Pressable
+  Pressable,
+  Image,
+  GestureResponderEvent,
+  Alert
 } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
-import { searchArtist } from '../../services/deezerService';
-// import { search } from '../../services/search';
-import TrackCard from '../../components/TrackCard/TrackCard';
+import { search } from '../../services/search';
 import useAudioPlayer from '../../hooks/useAudioPlayer';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { getAudioFromYouTube } from '../../services/youtube-service';
 
-interface TrackCardProps {
-  track: {
-    id: number;
-    title: string;
-    artist: { name: string; picture_medium: string };
-    album: { cover_medium: string };
-    preview: string;
-    duration: number;
-  };
+// Updated interface to match YouTube search results format
+interface VideoResult {
+  id: number;
+  title: string;
+  author: string;
+  authorUrl: string;
+  duration: string;
+  durationInSeconds: number;
+  thumbnail: string;
+  uploadedAt: string;
+  url: string;
+  views: string;
+}
+
+interface SearchResponse {
+  success: boolean;
+  query: string;
+  totalResults: number;
+  results: VideoResult[];
+}
+
+interface VideoCardProps {
+  video: VideoResult;
   onPlay: () => void;
   isPlaying: boolean;
 }
 
+// VideoCard component - defined once and outside the main component
+const VideoCard = ({ video, onPlay, isPlaying }: VideoCardProps) => {
+  const handlePlayButtonPress = (e: GestureResponderEvent) => {
+    e.stopPropagation();
+    onPlay();
+  };
+
+  return (
+    <TouchableOpacity 
+      style={styles.videoCard}
+      onPress={onPlay}
+      activeOpacity={0.7}
+    >
+      <View style={styles.thumbnailContainer}>
+        <Image 
+          source={{ uri: video.thumbnail }} 
+          style={styles.thumbnail}
+          resizeMode="cover"
+        />
+        <View style={styles.durationBadge}>
+          <Text style={styles.durationText}>{video.duration}</Text>
+        </View>
+      </View>
+
+      <View style={styles.videoInfo}>
+        <Text style={styles.videoTitle} numberOfLines={2}>{video.title}</Text>
+        <Text style={styles.channelName}>{video.author}</Text>
+        <View style={styles.videoStats}>
+          <Text style={styles.videoViews}>{video.views} views</Text>
+          <Text style={styles.videoViews}> • </Text>
+          <Text style={styles.videoViews}>{video.uploadedAt}</Text>
+        </View>
+      </View>
+
+      <TouchableOpacity 
+        style={[styles.playButton, isPlaying ? styles.pauseButton : null]}
+        onPress={handlePlayButtonPress}
+        hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+      >
+        <Ionicons 
+          name={isPlaying ? "pause" : "play"} 
+          size={24} 
+          color="#fff" 
+        />
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+};
+
 export default function ExploreScreen() {
+  
+  // State for audio conversion loading
+  const [isConverting, setIsConverting] = useState(false);
+  const [convertingTitle, setConvertingTitle] = useState('');
   const [query, setQuery] = useState('');
-  const [tracks, setTracks] = useState<TrackCardProps['track'][]>([]);
+  const [videos, setVideos] = useState<VideoResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [showRecent, setShowRecent] = useState(false);
+  const [totalResults, setTotalResults] = useState(0);
   const { playSound, pauseSound, isPlaying, currentlyPlayingId } = useAudioPlayer();
   const insets = useSafeAreaInsets();
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -88,21 +159,27 @@ export default function ExploreScreen() {
     setShowRecent(false);
     
     try {
-      const data = await searchArtist(query);
-      // const data2 = await search(query); 
-      // console.log(data2);
-      setTracks(data);
+      // Call search service and extract results array
+      const response = await search(query) as SearchResponse;
       
-      // Add to recent searches
-      if (!recentSearches.includes(query)) {
-        const newRecentSearches = [query, ...recentSearches.slice(0, 4)];
-        setRecentSearches(newRecentSearches);
+      if (response.success && response.results) {
+        setVideos(response.results);
+        setTotalResults(response.totalResults);
+        
+        // Add to recent searches
+        if (!recentSearches.includes(query)) {
+          const newRecentSearches = [query, ...recentSearches.slice(0, 4)];
+          setRecentSearches(newRecentSearches);
+        }
+        
+        triggerHaptic('success');
+      } else {
+        setVideos([]);
+        triggerHaptic('error');
       }
       
-      triggerHaptic('success');
-      
     } catch (error) {
-      console.error('Error:', error);
+      setVideos([]);
       triggerHaptic('error');
     } finally {
       setLoading(false);
@@ -135,6 +212,57 @@ export default function ExploreScreen() {
     }, 150);
   };
 
+  // Fixed handleVideoPlay function
+  const handleVideoPlay = async (video: VideoResult) => {
+    try {
+      // If the same video is playing, pause it
+      if (currentlyPlayingId === video.id.toString() && isPlaying) {
+        pauseSound();
+        return;
+      }
+      
+      // Show converting indicator
+      setIsConverting(true);
+      setConvertingTitle(video.title);
+      
+      // Try to get audio from the backend - pass the full video data for storage
+      const audioUrl = await getAudioFromYouTube(video.url, {
+        title: video.title,
+        author: video.author,
+        thumbnail: video.thumbnail,
+        duration: video.duration,
+        durationInSeconds: video.durationInSeconds
+      });
+      
+      console.log("Audio URL received:", audioUrl);
+      
+      // Play the audio with our useAudioPlayer hook
+      playSound({ 
+        previewUrl: audioUrl, 
+        trackId: video.id.toString()
+      });
+      
+      // Provide haptic feedback for successful play
+      triggerHaptic('medium');
+      
+    } catch (error) {
+      console.error('Error playing audio:', error);
+      
+      // Show error to user
+      Alert.alert(
+        "Playback Error", 
+        "Could not convert or play this video's audio. Please try again later.",
+        [{ text: "OK" }]
+      );
+      
+      triggerHaptic('error');
+    } finally {
+      // Hide converting indicator
+      setIsConverting(false);
+      setConvertingTitle('');
+    }
+  };
+
   const numColumns = isTablet ? 2 : 1;
 
   const renderHeader = () => (
@@ -148,8 +276,8 @@ export default function ExploreScreen() {
       }
     ]}>
       <Animated.View style={[styles.headerContent, { opacity: headerOpacity }]}>
-        <Text style={styles.headerTitle}>Discover new music</Text>
-        <Text style={styles.headerSubtitle}>Search for artists, songs, and more</Text>
+        <Text style={styles.headerTitle}>Explore Music</Text>
+        <Text style={styles.headerSubtitle}>Search for artists, songs, and videos</Text>
       </Animated.View>
     </Animated.View>
   );
@@ -182,7 +310,7 @@ export default function ExploreScreen() {
         />
         <TextInput
           ref={inputRef}
-          placeholder="Search for artists, songs, or podcasts"
+          placeholder="Search for music videos, artists, songs"
           placeholderTextColor="#999"
           value={query}
           onChangeText={setQuery}
@@ -218,7 +346,7 @@ export default function ExploreScreen() {
   );
 
   const renderEmptyState = () => {
-    if (loading || tracks.length > 0) return null;
+    if (loading || videos.length > 0) return null;
     
     return (
       <View style={[styles.emptyState, isTablet && styles.emptyStateTablet]}>
@@ -231,7 +359,7 @@ export default function ExploreScreen() {
           Search for music
         </Text>
         <Text style={[styles.emptyStateSubtitle, isTablet && styles.tabletSubText]}>
-          Find your favorite artists, songs, and more
+          Find your favorite artists, songs, and videos
         </Text>
       </View>
     );
@@ -265,6 +393,18 @@ export default function ExploreScreen() {
             <Text style={styles.recentSearchText}>{search}</Text>
           </Pressable>
         ))}
+      </View>
+    );
+  };
+
+  const renderSearchResults = () => {
+    if (videos.length === 0) return null;
+    
+    return (
+      <View style={styles.resultsHeader}>
+        <Text style={styles.resultsCount}>
+          {totalResults} results for "{query}"
+        </Text>
       </View>
     );
   };
@@ -311,16 +451,13 @@ export default function ExploreScreen() {
           {/* Results */}
           <FlatList
             key={`list-${numColumns}`}
-            data={tracks}
+            data={videos}
             keyExtractor={(item) => item.id.toString()}
             renderItem={({ item }) => (
-              <TrackCard
-                track={item}
-                onPlay={() => {
-                  playSound(item.preview, item.id);
-                  triggerHaptic('medium');
-                }}
-                isPlaying={currentlyPlayingId === item.id && isPlaying}
+              <VideoCard
+                video={item}
+                onPlay={() => handleVideoPlay(item)}
+                isPlaying={currentlyPlayingId === item.id.toString() && isPlaying}
               />
             )}
             numColumns={numColumns}
@@ -332,6 +469,7 @@ export default function ExploreScreen() {
                 paddingTop: 64,  // Added padding to account for search bar overlay
               }
             ]}
+            ListHeaderComponent={renderSearchResults}
             onScroll={Animated.event(
               [{ nativeEvent: { contentOffset: { y: scrollY } } }],
               { useNativeDriver: false }
@@ -342,11 +480,17 @@ export default function ExploreScreen() {
             keyboardShouldPersistTaps="handled"
             removeClippedSubviews={Platform.OS === 'android'}
             initialNumToRender={8}
-            maxToRenderPerBatch={8}
+            maxToRenderPerBatch={6}
             windowSize={10}
           />
         </>
       )}
+      
+      {/* LoadingOverlay for audio conversion */}
+      <LoadingOverlay 
+        visible={isConverting} 
+        message={`Converting "${convertingTitle}"\nto audio format...`}
+      />
     </View>
   );
 }
@@ -514,5 +658,90 @@ const styles = StyleSheet.create({
   },
   tabletSubText: {
     fontSize: 18,
+  },
+  resultsHeader: {
+    marginBottom: 16,
+    paddingTop: 8,
+  },
+  resultsCount: {
+    color: '#b3b3b3',
+    fontSize: 14,
+  },
+  // Styles for the VideoCard component
+  videoCard: {
+    flexDirection: 'row',
+    backgroundColor: '#1e1e1e',
+    marginBottom: 16,
+    borderRadius: 10,
+    overflow: 'hidden',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#333',
+    ...(Platform.OS === 'ios' 
+      ? { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3 } 
+      : { elevation: 2 })
+  },
+  thumbnailContainer: {
+    width: 120,
+    height: 72,
+    borderRadius: 6,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  thumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  durationBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  durationText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  videoInfo: {
+    flex: 1,
+    marginLeft: 12,
+    justifyContent: 'space-between',
+    padding: 2,
+  },
+  videoTitle: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  channelName: {
+    color: '#b3b3b3',
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  videoStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  videoViews: {
+    color: '#999',
+    fontSize: 11,
+  },
+  playButton: {
+    backgroundColor: '#1DB954',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginLeft: 8,
+  },
+  pauseButton: {
+    backgroundColor: '#444',
   },
 });
